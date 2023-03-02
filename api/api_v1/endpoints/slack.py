@@ -104,7 +104,7 @@ def hello(channel_id: str, user_id: str) -> Dict[str, str]:
 @router.post("/chatGPT")
 def chatGPT(channel_id: str, message_ts: str, text: str) -> Dict[str, str]:
     try:
-        answer = asyncio.run(get_answer(text))
+        answer = get_answer(text)
     except ServiceUnavailableError or APIError as e:
         answer = "서버가 불안정합니다. 잠시 후 다시 시도해주세요.\n" + str(e)
     except InvalidRequestError as e:
@@ -120,7 +120,7 @@ def chatGPT(channel_id: str, message_ts: str, text: str) -> Dict[str, str]:
 def chatGPTkr(channel_id: str, message_ts: str, text: str) -> Dict[str, str]:
     try:
         translated_text = translate_text(text, "en")
-        chatGPT_answer = asyncio.run(get_answer(translated_text))
+        chatGPT_answer = get_answer(translated_text)
         answer_in_ko = translate_text(chatGPT_answer, "ko")
         answer = chatGPT_answer + "\n" + answer_in_ko
     except ServiceUnavailableError or APIError as e:

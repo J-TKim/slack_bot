@@ -1,5 +1,5 @@
 import os
-import asyncio
+
 from dotenv import load_dotenv
 from typing import List, Dict, Optional
 
@@ -11,7 +11,7 @@ load_dotenv()
 openai.api_key = os.environ['OPEN_AI_TOKEN']
 CHATGPT_ENGINE = os.environ['CHATGPT_ENGINE']
 
-async def get_answer(prompt: str, history: Optional[List[Dict[str, str]]] = []) -> str:
+def get_answer(prompt: str, history: Optional[List[Dict[str, str]]] = []) -> str:
     response = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
         messages= history + [
@@ -32,5 +32,5 @@ if __name__ == "__main__":
     ]
     prompt = "can you tell me again in korean?"
 
-    print(asyncio.run(get_answer(prompt, history)))
+    print(get_answer(prompt, history))
 

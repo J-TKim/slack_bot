@@ -19,10 +19,10 @@ def health() -> Any:
     return {"status": "ok"}
 
 
-@router.get("/main")
+@router.get("/")
 async def chatGPT(text: str) -> Dict[str, str]:
     try:
-        answer = asyncio.run(get_answer(text))
+        answer = get_answer(text)
     except ServiceUnavailableError or APIError as e:
         answer = "서버가 불안정합니다. 잠시 후 다시 시도해주세요.\n" + str(e)
         return {"answer": answer, "error": e}
@@ -37,7 +37,7 @@ async def chatGPT(text: str) -> Dict[str, str]:
 async def chatGPTkr(text: str) -> Dict[str, str]:
     input_en = translate_text(text, "en")
     try:
-        answer = asyncio.run(get_answer(input_en))
+        answer = get_answer(input_en)
     except ServiceUnavailableError or APIError as e:
         answer = "서버가 불안정합니다. 잠시 후 다시 시도해주세요.\n" + str(e)
         return {"answer": answer, "error": e}
