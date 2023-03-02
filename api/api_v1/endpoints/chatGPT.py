@@ -3,7 +3,7 @@ from fastapi import APIRouter
 
 import asyncio
 
-from core.chatGPT.with_token import getAnswer as aget_chatGPT_answer
+from core.chatGPT.Official import get_answer
 from core.translator.google_translator import translate_text
 
 from openai.error import ServiceUnavailableError, APIError, InvalidRequestError
@@ -22,7 +22,7 @@ def health() -> Any:
 @router.get("/main")
 async def chatGPT(text: str) -> Dict[str, str]:
     try:
-        answer = asyncio.run(aget_chatGPT_answer(text))
+        answer = asyncio.run(get_answer(text))
     except ServiceUnavailableError or APIError as e:
         answer = "서버가 불안정합니다. 잠시 후 다시 시도해주세요.\n" + str(e)
         return {"answer": answer, "error": e}
@@ -37,7 +37,7 @@ async def chatGPT(text: str) -> Dict[str, str]:
 async def chatGPTkr(text: str) -> Dict[str, str]:
     input_en = translate_text(text, "en")
     try:
-        answer = asyncio.run(aget_chatGPT_answer(input_en))
+        answer = asyncio.run(get_answer(input_en))
     except ServiceUnavailableError or APIError as e:
         answer = "서버가 불안정합니다. 잠시 후 다시 시도해주세요.\n" + str(e)
         return {"answer": answer, "error": e}
