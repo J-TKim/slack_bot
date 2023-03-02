@@ -1,4 +1,5 @@
 import logging
+import os
 import threading
 from typing import Dict, List, Union
 
@@ -9,7 +10,7 @@ from core.slack.slack_api import slackAPI
 from core.slack.slack_func import SlackParser
 from core.translator.google_translator import translate_text
 from models.challenge import Challenge
-from core.chatGPT.with_token import getAnswer as get_chatGPT_answer
+from core.chatGPT.Official import get_answer
 
 from openai.error import ServiceUnavailableError, APIError, InvalidRequestError
 
@@ -82,7 +83,7 @@ def jeongtest() -> Dict[str, str]:
     운영알림 채널에, 정태에게 200을 보냄
     :return: {"status": "ok"}
     """
-    user_id = "U02H9S59LA1" # 정태
+    user_id = os.environ['SLACK_BOT_ADMIN_USER_ID']
 
     slackAPI.post_message("C02JD3EMR6X", f"<@{user_id}> 200")
 
@@ -103,7 +104,7 @@ def hello(channel_id: str, user_id: str) -> Dict[str, str]:
 @router.post("/chatGPT")
 def chatGPT(channel_id: str, message_ts: str, text: str) -> Dict[str, str]:
     try:
-        answer = asyncio.run(get_chatGPT_answer(text))
+        answer = get_answer(text)
     except ServiceUnavailableError or APIError as e:
         answer = "서버가 불안정합니다. 잠시 후 다시 시도해주세요.\n" + str(e)
     except InvalidRequestError as e:
@@ -119,7 +120,7 @@ def chatGPT(channel_id: str, message_ts: str, text: str) -> Dict[str, str]:
 def chatGPTkr(channel_id: str, message_ts: str, text: str) -> Dict[str, str]:
     try:
         translated_text = translate_text(text, "en")
-        chatGPT_answer = asyncio.run(get_chatGPT_answer(translated_text))
+        chatGPT_answer = get_answer(translated_text)
         answer_in_ko = translate_text(chatGPT_answer, "ko")
         answer = chatGPT_answer + "\n" + answer_in_ko
     except ServiceUnavailableError or APIError as e:
