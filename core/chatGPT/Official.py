@@ -13,7 +13,7 @@ CHATGPT_ENGINE = os.environ['CHATGPT_ENGINE']
 
 def get_answer(prompt: str, history: Optional[List[Dict[str, str]]] = []) -> str:
     response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
+        model=CHATGPT_ENGINE,
         messages= history + [
             {"role": "user", "content": prompt},
         ]

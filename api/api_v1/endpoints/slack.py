@@ -37,9 +37,6 @@ async def root(request_body: Union[dict, Challenge] = Body(...)) -> Dict[str, st
     if cmd == "chatGPT".lower():
         th = threading.Thread(target=chatGPT, args=(channel_id, message_ts, text))
         th.start()
-    elif cmd == "chatGPTkr".lower():
-        th = threading.Thread(target=chatGPTkr, args=(channel_id, message_ts, text))
-        th.start()
     elif cmd == "hello":
         th = threading.Thread(target=hello, args=(channel_id, user_id))
         th.start()
@@ -67,20 +64,21 @@ async def root(request_body: Union[dict, Challenge] = Body(...)) -> Dict[str, st
 @router.post("/temp")
 def temp(channel_id: str, message_ts: str) -> Dict[str, List[str]]:
     """
-    명령어 리스트들을 알려준다.
+    명령어 리스트, 예시를 알려준다.
     :param channel_id: 채널 아이디
     :param message_ts: 메세지 ts
     :return:
     """
     text = "아래 명령어들을 참고해주세요\n" + "\n".join([f"path: {r.path}\t name: {r.name}" for r in router.routes])
+    text += "\n" + f"example) <@{os.environ['SLACK_BOT_USER_ID']}> chatGPT 안녕 정태야"
     slackAPI.post_thread_message(channel_id, message_ts, text)
 
     return {"routes": router.routes}
 
 @router.post("/jeongtest")
 def jeongtest() -> Dict[str, str]:
-    """
-    운영알림 채널에, 정태에게 200을 보냄
+    f"""
+    운영알림 채널에, {os.environ['SLACK_BOT_ADMIN_USER_ID']} 에게 200을 보냄
     :return: {"status": "ok"}
     """
     user_id = os.environ['SLACK_BOT_ADMIN_USER_ID']
@@ -101,6 +99,7 @@ def hello(channel_id: str, user_id: str) -> Dict[str, str]:
     slackAPI.post_message(channel_id, f"안녕하세요 <@{user_id}>!")
     return {"status": "ok"}
 
+
 @router.post("/chatGPT")
 def chatGPT(channel_id: str, message_ts: str, text: str) -> Dict[str, str]:
     try:
@@ -113,25 +112,6 @@ def chatGPT(channel_id: str, message_ts: str, text: str) -> Dict[str, str]:
     slackAPI.post_thread_message(channel_id, message_ts, answer)
 
     logging.info(f"input, {text}, output, {answer}")
-    return {"status": "ok"}
-
-
-@router.post("/chatGPTkr")
-def chatGPTkr(channel_id: str, message_ts: str, text: str) -> Dict[str, str]:
-    try:
-        translated_text = translate_text(text, "en")
-        chatGPT_answer = get_answer(translated_text)
-        answer_in_ko = translate_text(chatGPT_answer, "ko")
-        answer = chatGPT_answer + "\n" + answer_in_ko
-    except ServiceUnavailableError or APIError as e:
-        answer = "서버가 불안정합니다. 잠시 후 다시 시도해주세요.\n" + str(e)
-    except InvalidRequestError as e:
-        answer = "InvalidRequestError.\n" + str(e)
-
-    slackAPI.post_thread_message(channel_id, message_ts, answer)
-
-    logging.info(f"input: {text}, translated_text: {translated_text})")
-    logging.info(f"output: {chatGPT_answer}, output_in_ko: {answer_in_ko}")
     return {"status": "ok"}
 
 

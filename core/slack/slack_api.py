@@ -1,11 +1,15 @@
+
 import os
 import ssl
+from typing import List, Dict
 from dotenv import load_dotenv
 
 from slack_sdk import WebClient
+from slack_sdk.errors import SlackApiError
+
+from core.slack.slack_func import SlackParser
 
 ssl._create_default_https_context = ssl._create_unverified_context
-
 
 load_dotenv()
 SLACK_API_TOKEN = os.environ["SLACK_API_TOKEN"]
@@ -126,10 +130,29 @@ class SlackAPI:
 
         return user_group_team_id_set
 
+    def get_all_thread_messages(self, message_ts: str) -> List[str]:
+        try:
+            result = self.client.conversations_replies(channel=os.environ['SLACK_TEST_CHANNEL_ID'], ts=message_ts)
+
+            message_list: List[Dict[str, str]] = []
+
+            messages_data = result.data['messages']
+            for message_data in messages_data:
+                message = message_data['text']
+                user_id = message_data['user']
+
+                message_list.append({"message": message, "user_id": user_id})
+
+            return message_list
+
+        except SlackApiError as e:
+            print("Error: {}".format(e))
+            raise
+
 
 slackAPI = SlackAPI(SLACK_API_TOKEN)
 
 if __name__ == "__main__":
     channel_id = os.environ['SLACK_TEST_CHANNEL_ID'] # 테스트 채널
 
-    slackAPI.post_message(channel_id, f"Hello World! <@{os.environ['OPEN_AI_TOKEN']}>")
+    slackAPI.post_message(channel_id, f"Hello World! <@{os.environ['SLACK_BOT_ADMIN_USER_ID']}>")
