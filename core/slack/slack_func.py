@@ -7,6 +7,7 @@ import logging
 
 load_dotenv()
 SLACK_API_TOKEN = os.environ["SLACK_API_TOKEN"]
+SLACK_BOT_USER_ID = os.environ['SLACK_BOT_USER_ID']
 
 
 class SlackParser:
@@ -29,6 +30,10 @@ class SlackParser:
     @staticmethod
     def get_event_ts(request_body: dict) -> str:
         return request_body["event"]["event_ts"]
+
+    @staticmethod
+    def get_thread_ts(request_body: dict) -> str:
+        return request_body["event"]["thread_ts"]
 
     @staticmethod
     def get_text(request_body: dict) -> str:
@@ -57,16 +62,21 @@ class SlackParser:
     @staticmethod
     def thread_messages_to_openai_history_form(thread_messages: List[Dict[str, str]]) -> List[Dict[str, str]]:
         history_list: List[Dict[str, str]] = list()
-        SLACK_BOT_USER_ID = os.environ['SLACK_BOT_USER_ID']
         input_pattern = fr"^{re.escape(f'<@{SLACK_BOT_USER_ID}>')}\schatGPT.*$"
-        answer_pattern = r"^chatGPT\n.*$"
+        answer_pattern = r"^chatGPT\s*\n.*$"
 
         for thread_message in thread_messages:
-            if thread_message["user_id"] != os.environ['SLACK_BOT_USER_ID']:
+            if thread_message["user_id"] != SLACK_BOT_USER_ID:
                 if bool(re.match(input_pattern, thread_message['message'])):
-                    history_list.append({"role": "user", "content": thread_message['message']})
-            if thread_message['user_id'] == os.environ['SLACK_BOT_USER_ID']:
+                    history_list.append({
+                        "role": "user",
+                        "content": re.sub(fr"^{re.escape(f'<@{SLACK_BOT_USER_ID}>')}\schatGPT\s*", "", thread_message['message']).strip()
+                    })
+            if thread_message['user_id'] == SLACK_BOT_USER_ID:
                 if bool(re.match(answer_pattern, thread_message['message'])):
-                    history_list.append({"role": "assistant", "content": thread_message['message']})
+                    history_list.append({
+                        "role": "assistant",
+                        "content": re.sub(r"^\n*chatGPT\s*\n+", "", thread_message['message']).strip()
+                    })
 
         return history_list
