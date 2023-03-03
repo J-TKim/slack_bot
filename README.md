@@ -11,6 +11,7 @@ slack 에 여러 기능을 붙혀 사용하기 위해 만들었습니다.
 
 ```shell
 git clone git@github.com:J-TKim/slack_bot.git
+cd slack_bot
 cp .env_example .env
 ```
 
@@ -20,11 +21,13 @@ cp .env_example .env
 ### run with docker
 
 ```shell
+TAG_NAME=slack_bot
 docker build -t ${TAG_NAME} . 
 docker run --rm -p 30100:30100 ${TAG_NAME}
 ```
 
 ### run in local
 ```shell
+PORT=30100
 uvicorn --host=0.0.0.0 --port ${PORT} main:app --reload
 ```
