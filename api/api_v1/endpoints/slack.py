@@ -42,20 +42,14 @@ async def root(request_body: Union[dict, Challenge] = Body(...)) -> Dict[str, st
     elif cmd == "hello":
         th = threading.Thread(target=hello, args=(channel_id, user_id))
         th.start()
-    elif cmd == "jeongtest":
-        th = threading.Thread(target=jeongtest, args=(channel_id,))
-        th.start()
-    elif cmd == "google/to_kr":
-        th = threading.Thread(target=google_translator_to_kr, args=(channel_id, thread_ts, text))
-        th.start()
-    elif cmd == "google/to_en":
-        th = threading.Thread(target=google_translator_to_en, args=(channel_id, thread_ts, text))
+    elif cmd == "summarize":
+        th = threading.Thread(target=summarize, args=(channel_id, thread_ts))
         th.start()
     elif cmd == "root" or cmd not in api_lists:
         logging.info(cmd)
         channel_id = SlackParser.get_channel_id(request_body)
         thread_ts = SlackParser.get_event_ts(request_body)
-        th = threading.Thread(target=temp, args=(channel_id, thread_ts))
+        th = threading.Thread(target=post_cmd_list, args=(channel_id, thread_ts))
         th.start()
 
     logging.info("---main_end---")
@@ -63,8 +57,8 @@ async def root(request_body: Union[dict, Challenge] = Body(...)) -> Dict[str, st
 
 
 # TODO 아래에 있는 것들 api 호출로 변경
-@router.post("/temp")
-def temp(channel_id: str, message_ts: str) -> Dict[str, List[str]]:
+@router.post("/post_cmd_list")
+def post_cmd_list(channel_id: str, message_ts: str) -> Dict[str, List[str]]:
     """
     명령어 리스트, 예시를 알려준다.
     :param channel_id: 채널 아이디
@@ -76,18 +70,6 @@ def temp(channel_id: str, message_ts: str) -> Dict[str, List[str]]:
     slackAPI.post_thread_message(channel_id, message_ts, text)
 
     return {"routes": router.routes}
-
-@router.post("/jeongtest")
-def jeongtest() -> Dict[str, str]:
-    f"""
-    운영알림 채널에, {os.environ['SLACK_BOT_ADMIN_USER_ID']} 에게 200을 보냄
-    :return: {"status": "ok"}
-    """
-    user_id = os.environ['SLACK_BOT_ADMIN_USER_ID']
-
-    slackAPI.post_message("C02JD3EMR6X", f"<@{user_id}> 200")
-
-    return {"status": "ok"}
 
 @router.post("/hello")
 def hello(channel_id: str, user_id: str) -> Dict[str, str]:
@@ -104,6 +86,12 @@ def hello(channel_id: str, user_id: str) -> Dict[str, str]:
 
 @router.post("/chatGPT")
 def chatGPT(channel_id: str, thread_ts: str, text: str) -> Dict[str, str]:
+    """
+    챗지피티가 답변을 쓰레드에 보내주는 함수
+    :param channel_id: 채널 아이디
+    :param thread_ts: 쓰레드 ts
+    :return: {"status": "ok"}
+    """
     try:
         history = SlackParser.thread_messages_to_openai_history_form(slackAPI.get_all_thread_messages(channel_id, thread_ts))[:-1]
     except Exception as e:
@@ -134,5 +122,27 @@ def google_translator_to_kr(channel_id: str, message_ts: str, text: str) -> Dict
 def google_translator_to_en(channel_id: str, message_ts: str, text: str) -> Dict[str, str]:
     answer = translate_text(text, "en")
     slackAPI.post_thread_message(channel_id, message_ts, answer)
+
+    return {"status": "ok"}
+
+@router.post("/summarize")
+def summarize(channel_id: str, thread_ts: str) -> Dict[str, str]:
+    """
+    쓰레드의 내용을 요약해서 쓰레드에 남김.
+    :param channel_id: 채널 아이디
+    :param thread_ts: 쓰레드 ts
+    :return: {"status": "ok"}
+    """
+
+    slack_thread_history = [{"message": message_data['message'], "user_id": f"<@{message_data['user_id']}>"}for message_data in slackAPI.get_all_thread_messages(channel_id, thread_ts)]
+
+    try:
+        answer = get_answer("아래 대화 내용을 요약해줘\n" + '\n'.join(map(str, slack_thread_history)))
+    except ServiceUnavailableError or APIError as e:
+        answer = "서버가 불안정합니다. 잠시 후 다시 시도해주세요.\n" + str(e)
+    except InvalidRequestError as e:
+        answer = "InvalidRequestError.\n" + str(e)
+
+    slackAPI.post_thread_message(channel_id, thread_ts, "summarize\n" + answer)
 
     return {"status": "ok"}
