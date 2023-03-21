@@ -48,6 +48,14 @@ class SlackParser:
         return request_body["event"]["user"]
 
     @staticmethod
+    def get_subtype(request_body: dict) -> str:
+        return request_body["subtype"]
+
+    @staticmethod
+    def get_bot_id(request_body: dict) -> str:
+        return request_body["bot_id"]
+
+    @staticmethod
     def get_cmd_and_text(request_body: dict) -> tuple:
         line = request_body["event"]["text"].split(" ")
         logging.info(line)
@@ -60,23 +68,23 @@ class SlackParser:
         return line[1], None
 
     @staticmethod
-    def thread_messages_to_openai_history_form(thread_messages: List[Dict[str, str]]) -> List[Dict[str, str]]:
+    def thread_messages_to_openai_history_form(thread_messages: List[Dict[str, str]], pattern: str) -> List[Dict[str, str]]:
         history_list: List[Dict[str, str]] = list()
         input_pattern = fr"^{re.escape(f'<@{SLACK_BOT_USER_ID}>')}\schatGPT.*$"
-        answer_pattern = r"^chatGPT\s*\n.*$"
+        answer_pattern = fr"{pattern}\n.*"
 
         for thread_message in thread_messages:
             if thread_message["user_id"] != SLACK_BOT_USER_ID:
                 if bool(re.match(input_pattern, thread_message['message'])):
                     history_list.append({
                         "role": "user",
-                        "content": re.sub(fr"^{re.escape(f'<@{SLACK_BOT_USER_ID}>')}\schatGPT\s*", "", thread_message['message']).strip()
+                        "content": re.sub(fr"^{re.escape(f'<@{SLACK_BOT_USER_ID}>')}\s{pattern}\s*", "", thread_message['message']).strip()
                     })
             if thread_message['user_id'] == SLACK_BOT_USER_ID:
                 if bool(re.match(answer_pattern, thread_message['message'])):
                     history_list.append({
                         "role": "assistant",
-                        "content": re.sub(r"^\n*chatGPT\s*\n+", "", thread_message['message']).strip()
+                        "content": re.sub(fr"{pattern}\n+", "", thread_message['message']).strip()
                     })
 
         return history_list

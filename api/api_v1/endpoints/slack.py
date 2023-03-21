@@ -9,12 +9,16 @@ from core.slack.slack_api import slackAPI
 from core.slack.slack_func import SlackParser
 from core.translator.google_translator import translate_text
 from models.challenge import Challenge
-from core.chatGPT.Official import get_answer
-
+from core.openai.chatGPT import (
+    get_answer,
+    split_messages_under_limit_token
+)
 from openai.error import ServiceUnavailableError, APIError, InvalidRequestError
 
 
 router = APIRouter()
+
+logging.basicConfig(level=logging.INFO)
 
 
 @router.post("/")
@@ -38,6 +42,12 @@ async def root(request_body: Union[dict, Challenge] = Body(...)) -> Dict[str, st
 
     if cmd == "chatGPT":
         th = threading.Thread(target=chatGPT, args=(channel_id, thread_ts, text))
+        th.start()
+    elif cmd == "pyGPT":
+        th = threading.Thread(target=pyGPT, args=(channel_id, thread_ts, text))
+        th.start()
+    elif cmd == "scalaGPT":
+        th = threading.Thread(target=scalaGPT, args=(channel_id, thread_ts, text))
         th.start()
     elif cmd == "hello":
         th = threading.Thread(target=hello, args=(channel_id, user_id))
@@ -66,7 +76,7 @@ def post_cmd_list(channel_id: str, message_ts: str) -> Dict[str, List[str]]:
     :return:
     """
     text = "아래 명령어들을 참고해주세요\n" + "\n".join([f"path: {r.path}\t name: {r.name}" for r in router.routes])
-    text += "\n" + f"example) <@{os.environ['SLACK_BOT_USER_ID']}> chatGPT 안녕 정태야"
+    text += "\n" + f"example) <@{os.environ['SLACK_BOT_USER_ID']}> openai 안녕 정태야"
     slackAPI.post_thread_message(channel_id, message_ts, text)
 
     return {"routes": router.routes}
@@ -93,8 +103,9 @@ def chatGPT(channel_id: str, thread_ts: str, text: str) -> Dict[str, str]:
     :return: {"status": "ok"}
     """
     try:
-        history = SlackParser.thread_messages_to_openai_history_form(slackAPI.get_all_thread_messages(channel_id, thread_ts))[:-1]
+        history = SlackParser.thread_messages_to_openai_history_form(slackAPI.get_all_thread_messages(channel_id, thread_ts), pattern="chatGPT")[:-1]
     except Exception as e:
+        slackAPI.post_thread_message(channel_id, thread_ts, str(e))
         raise e
 
     try:
@@ -104,7 +115,62 @@ def chatGPT(channel_id: str, thread_ts: str, text: str) -> Dict[str, str]:
     except InvalidRequestError as e:
         answer = "InvalidRequestError.\n" + str(e)
 
-    slackAPI.post_thread_message(channel_id, thread_ts, "chatGPT\n" + answer)
+    slackAPI.post_thread_message(channel_id, thread_ts, "openai\n" + answer)
+
+    logging.info(f"input, {text}, output, {answer}")
+    return {"status": "ok"}
+
+
+@router.post("/pyGPT")
+def pyGPT(channel_id: str, thread_ts: str, text: str) -> Dict[str, str]:
+    """
+    챗지피티가 파이썬 인터프리터 처럼 행동해서 답변을 쓰레드에 보내주는 함수
+    :param channel_id: 채널 아이디
+    :param thread_ts: 쓰레드 ts
+    :return: {"status": "ok"}
+    """
+    try:
+        history = SlackParser.thread_messages_to_openai_history_form(slackAPI.get_all_thread_messages(channel_id, thread_ts), pattern="pyGPT")[:-1]
+    except Exception as e:
+        slackAPI.post_thread_message(channel_id, thread_ts, str(e))
+        raise e
+
+    try:
+        system = "I want you to act like a Python interpreter. I will give you Python code, and you will execute it. Do not provide any explanations. Do not respond with anything except the output of the code."
+        answer = get_answer(text, history, system)
+    except ServiceUnavailableError or APIError as e:
+        answer = "서버가 불안정합니다. 잠시 후 다시 시도해주세요.\n" + str(e)
+    except InvalidRequestError as e:
+        answer = "InvalidRequestError.\n" + str(e)
+
+    slackAPI.post_thread_message(channel_id, thread_ts, "pyGPT\n" + answer)
+
+    logging.info(f"input, {text}, output, {answer}")
+    return {"status": "ok"}
+
+@router.post("/scalaGPT")
+def scalaGPT(channel_id: str, thread_ts: str, text: str) -> Dict[str, str]:
+    """
+    챗지피티가 스칼라 인터프리터 처럼 행동해서 답변을 쓰레드에 보내주는 함수
+    :param channel_id: 채널 아이디
+    :param thread_ts: 쓰레드 ts
+    :return: {"status": "ok"}
+    """
+    try:
+        history = SlackParser.thread_messages_to_openai_history_form(slackAPI.get_all_thread_messages(channel_id, thread_ts), pattern="scalaGPT")[:-1]
+    except Exception as e:
+        slackAPI.post_thread_message(channel_id, thread_ts, str(e))
+        raise e
+
+    try:
+        system = "I want you to act like a Scala interpreter. I will give you Scala code, and you will execute it. Do not provide any explanations. Do not respond with anything except the output of the code."
+        answer = get_answer(text, history, system)
+    except ServiceUnavailableError or APIError as e:
+        answer = "서버가 불안정합니다. 잠시 후 다시 시도해주세요.\n" + str(e)
+    except InvalidRequestError as e:
+        answer = "InvalidRequestError.\n" + str(e)
+
+    slackAPI.post_thread_message(channel_id, thread_ts, "scalaGPT\n" + answer)
 
     logging.info(f"input, {text}, output, {answer}")
     return {"status": "ok"}
@@ -133,14 +199,27 @@ def summarize(channel_id: str, thread_ts: str) -> Dict[str, str]:
     :param thread_ts: 쓰레드 ts
     :return: {"status": "ok"}
     """
-
+    logging.info(f"summarize, {channel_id}, {thread_ts}")
     slack_thread_history = [{"message": message_data['message'], "user_id": f"<@{message_data['user_id']}>"}for message_data in slackAPI.get_all_thread_messages(channel_id, thread_ts)]
 
+    split_slack_thread_history = split_messages_under_limit_token(slack_thread_history, 2**12 - 500)
+    middle_prompt = ""
     try:
-        answer = get_answer("아래 대화 내용을 요약해줘\n" + '\n'.join(map(str, slack_thread_history)))
+        if len(split_slack_thread_history) == 1:
+            answer = get_answer("아래 대화 내용을 요약해줘\n" + '\n'.join(map(str, split_slack_thread_history[0])))
+
+        else:
+            for idx, slack_thread_data in enumerate(split_slack_thread_history):
+                logging.info(f"idx: {idx}")
+                temp = get_answer("아래 대화 내용을 요약해줘\n" + '\n'.join(map(str, slack_thread_data))) + "\n"
+                middle_prompt += temp
+            answer = get_answer("아래 대화 내용을 요약해줘\n" + middle_prompt)
+
     except ServiceUnavailableError or APIError as e:
+        logging.info(str(e))
         answer = "서버가 불안정합니다. 잠시 후 다시 시도해주세요.\n" + str(e)
     except InvalidRequestError as e:
+        logging.info(str(e))
         answer = "InvalidRequestError.\n" + str(e)
 
     slackAPI.post_thread_message(channel_id, thread_ts, "summarize\n" + answer)
