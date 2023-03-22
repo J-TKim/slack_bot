@@ -76,7 +76,7 @@ def post_cmd_list(channel_id: str, message_ts: str) -> Dict[str, List[str]]:
     :return:
     """
     text = "아래 명령어들을 참고해주세요\n" + "\n".join([f"path: {r.path}\t name: {r.name}" for r in router.routes])
-    text += "\n" + f"example) <@{os.environ['SLACK_BOT_USER_ID']}> openai 안녕 정태야"
+    text += "\n" + f"example) <@{os.environ['SLACK_BOT_USER_ID']}> chatGPT 안녕 정태야"
     slackAPI.post_thread_message(channel_id, message_ts, text)
 
     return {"routes": router.routes}
@@ -115,7 +115,7 @@ def chatGPT(channel_id: str, thread_ts: str, text: str) -> Dict[str, str]:
     except InvalidRequestError as e:
         answer = "InvalidRequestError.\n" + str(e)
 
-    slackAPI.post_thread_message(channel_id, thread_ts, "openai\n" + answer)
+    slackAPI.post_thread_message(channel_id, thread_ts, "chatGPT\n" + answer)
 
     logging.info(f"input, {text}, output, {answer}")
     return {"status": "ok"}
@@ -200,7 +200,7 @@ def summarize(channel_id: str, thread_ts: str) -> Dict[str, str]:
     :return: {"status": "ok"}
     """
     logging.info(f"summarize, {channel_id}, {thread_ts}")
-    slack_thread_history = [{"message": message_data['message'], "user_id": f"<@{message_data['user_id']}>"}for message_data in slackAPI.get_all_thread_messages(channel_id, thread_ts)]
+    slack_thread_history = [{"message": message_data['message'], "user_id": f"<@{message_data['user_id']}>"}for message_data in slackAPI.get_all_thread_messages(channel_id, thread_ts)][:-1]
 
     split_slack_thread_history = split_messages_under_limit_token(slack_thread_history, 2**12 - 500)
     middle_prompt = ""
